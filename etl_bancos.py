@@ -49,3 +49,69 @@ def run_etl_pipeline():
 
     # Renomeando as colunas para facilitar o acesso
     df_top5_banks.columns = ["Rank", "Bank name", "Market cap (USD billion)"]
+
+    print("Extração dos dados dos 5 maiores bancos concluída.")
+    print("Dados extraídos:")
+    print(df_top5_banks)
+
+    # --- 2. Transformação (Transform) ---
+    print("\nIniciando o processo de transformação...")
+
+    # Obtendo as taxas de câmbio para as moedas desejadas
+    rate_gbp = df_exchange[df_exchange["Currency"] == "GBP"]["Rate"].iloc[0]
+    rate_eur = df_exchange[df_exchange["Currency"] == "EUR"]["Rate"].iloc[0]
+    rate_inr = df_exchange[df_exchange["Currency"] == "INR"]["Rate"].iloc[0]
+
+    print(f"Taxas de câmbio utilizadas: GBP={rate_gbp}, EUR={rate_eur}, INR={rate_inr}")
+
+    # Convertendo a coluna de capitalização de mercado para tipo numérico
+    df_top5_banks["Market cap (USD billion)"] = pd.to_numeric(
+        df_top5_banks["Market cap (USD billion)"]
+    )
+
+    # Calculando a capitalização nas novas moedas
+    df_top5_banks["Capitalização em GBP (billion)"] = round(
+        df_top5_banks["Market cap (USD billion)"] * rate_gbp, 2
+    )
+    df_top5_banks["Capitalização em EUR (billion)"] = round(
+        df_top5_banks["Market cap (USD billion)"] * rate_eur, 2
+    )
+    df_top5_banks["Capitalização em INR (billion)"] = round(
+        df_top5_banks["Market cap (USD billion)"] * rate_inr, 2
+    )
+
+    print("Transformação dos dados concluída.")
+
+    # --- 3. Carregamento (Load) ---
+    print("\nIniciando o processo de carregamento...")
+
+    # Selecionando e renomeando as colunas para o arquivo final
+    df_final = df_top5_banks[
+        [
+            "Bank name",
+            "Capitalização em GBP (billion)",
+            "Capitalização em EUR (billion)",
+            "Capitalização em INR (billion)",
+        ]
+    ]
+    df_final.columns = [
+        "Nome do Banco",
+        "Capitalização em GBP",
+        "Capitalização em EUR",
+        "Capitalização em INR",
+    ]
+
+    # Salvando o DataFrame final em um arquivo CSV
+    output_filename = "maiores_bancos_por_capitalizacao.csv"
+    df_final.to_csv(output_filename, index=False)
+
+    print(
+        f"Processo de ETL concluído! Os dados foram salvos no arquivo '{output_filename}'."
+    )
+    print("\nResultado Final:")
+    print(df_final)
+
+
+# Executando o pipeline
+if __name__ == "__main__":
+    run_etl_pipeline()
