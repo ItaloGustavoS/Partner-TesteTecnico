@@ -37,23 +37,38 @@ def run_etl_pipeline():
 
     # Encontrando a tabela correta. A legenda da tabela que queremos é
     # 'By market capitalization'.
-    table_selector = "table.wikitable:nth-child(18)"
-    table = soup.select_one(table_selector)
+    table = None
+    # O título "By market capitalization" está dentro de uma tag <span> com um ID específico.
+    span = soup.find("span", id="By_market_capitalization")
+    if span:
+        # A tabela que queremos é o próximo elemento 'table' depois do título.
+        table = span.find_next("table")
 
     if table is None:
         print(
-            f"Erro: Não foi possível encontrar a tabela usando o seletor CSS '{table_selector}'. O layout da página pode ter mudado."
+            "Erro: Não foi possível encontrar a tabela 'By market capitalization'. O layout da página pode ter mudado."
         )
         sys.exit()  # Encerra o script se a tabela não for encontrada.
 
-    # Convertendo a tabela HTML para um DataFrame do Pandas
-    df_banks_raw = pd.read_html(str(table))[0]
+    # Convertendo a tabela HTML para um DataFrame do Pandas.
+    # O 'header=1' diz ao Pandas para usar a segunda linha do cabeçalho (índice 1) como os nomes das colunas,
+    # o que simplifica o cabeçalho de múltiplas linhas.
+    df_banks_raw = pd.read_html(str(table), header=1)[0]
+
+    # Selecionamos as colunas que nos interessam. Dada a nova estrutura,
+    # queremos 'Bank name' e a primeira coluna 'Market cap (US$ billion)'.
+    df_banks_raw = df_banks_raw[["Bank name", "Market cap(US$ billion)"]]
+
+    # Removendo a linha de referência, se existir (começa com '[')
+    df_banks_raw = df_banks_raw[
+        ~df_banks_raw["Bank name"].str.startswith("[", na=False)
+    ]
 
     # Selecionando os 5 maiores bancos
-    df_top5_banks = df_banks_raw.head(5)
+    df_top5_banks = df_banks_raw.head(5).copy()
 
-    # Renomeando as colunas para facilitar o acesso
-    df_top5_banks.columns = ["Rank", "Bank name", "Market cap (USD billion)"]
+    # Renomeando as colunas para o padrão que o resto do script espera
+    df_top5_banks.columns = ["Bank name", "Market cap (USD billion)"]
 
     print("Extração dos dados dos 5 maiores bancos concluída.")
     print("Dados extraídos:")
