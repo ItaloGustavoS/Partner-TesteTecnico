@@ -37,15 +37,12 @@ def run_etl_pipeline():
 
     # Encontrando a tabela correta. A legenda da tabela que queremos é
     # 'By market capitalization'.
-    table = None
-    span = soup.find("span", id="By_market_capitalization")
-    if span:
-        # O 'find_next' é usado para encontrar a próxima tag 'table' após o título
-        table = span.find_next("table")
+    table_selector = "table.wikitable:nth-child(18)"
+    table = soup.select_one(table_selector)
 
     if table is None:
         print(
-            "Erro: Não foi possível encontrar a tabela 'By market capitalization'. O layout da página pode ter mudado."
+            f"Erro: Não foi possível encontrar a tabela usando o seletor CSS '{table_selector}'. O layout da página pode ter mudado."
         )
         sys.exit()  # Encerra o script se a tabela não for encontrada.
 
