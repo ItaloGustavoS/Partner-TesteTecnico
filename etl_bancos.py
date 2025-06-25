@@ -20,8 +20,12 @@ def run_etl_pipeline():
     print("Iniciando o processo de extração...")
 
     try:
-        # Fazendo a requisição HTTP para a página da Wikipedia
-        response_wiki = requests.get(url_wiki)
+        # Definindo um User-Agent para simular um navegador
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
+        }
+        # Fazendo a requisição HTTP para a página da Wikipedia com o User-Agent
+        response_wiki = requests.get(url_wiki, headers=headers)
         response_wiki.raise_for_status()  # Lança um erro para status HTTP ruins (4xx ou 5xx)
 
         # Lendo as taxas de câmbio diretamente para um DataFrame Pandas
@@ -35,40 +39,66 @@ def run_etl_pipeline():
     # Usando BeautifulSoup para parsear o conteúdo HTML da página
     soup = BeautifulSoup(response_wiki.content, "html.parser")
 
-    # Encontrando a tabela correta. A legenda da tabela que queremos é
-    # 'By market capitalization'.
-    table = None
-    # O título "By market capitalization" está dentro de uma tag <span> com um ID específico.
-    span = soup.find("span", id="By_market_capitalization")
-    if span:
-        # A tabela que queremos é o próximo elemento 'table' depois do título.
-        table = span.find_next("table")
+    # Estratégia alternativa: Encontrar todas as tabelas e identificar a correta por seu conteúdo/cabeçalhos.
+    # Estratégia: A tabela "By market capitalization" é geralmente a 3ª tabela com class="wikitable".
+    all_wikitables = soup.find_all("table", class_="wikitable")
+    # print(f"DEBUG: Found {len(all_wikitables)} tables with class 'wikitable'.") # Debug print removed
 
-    if table is None:
+    df_banks_raw = None
+
+    if len(all_wikitables) >= 3:
+        target_table_html = all_wikitables[2] # 0-indexed, so 2 is the third table
+        # print("DEBUG: Assuming the 3rd wikitable is the target for 'By market capitalization'.") # Debug print removed
+        try:
+            dfs = pd.read_html(str(target_table_html), header=0)
+            if dfs:
+                df_candidate = dfs[0] # Assume the first DataFrame from this table is the one.
+                # print(f"DEBUG: Columns in 3rd wikitable: {df_candidate.columns.tolist()}") # Debug print removed
+
+                if "Bank name" not in df_candidate.columns:
+                    pass # print("DEBUG: 'Bank name' column not found in the 3rd wikitable.") # Debug print removed
+                else:
+                    market_cap_col_candidate = None
+                    # Check for specific GlobalData column name (index 2, which is column 3)
+                    if len(df_candidate.columns) > 2 and "GlobalData" in str(df_candidate.columns[2]) and ".1" in str(df_candidate.columns[2]):
+                        market_cap_col_candidate = df_candidate.columns[2]
+                    # Fallback: if not that, check if there's any col at index 2 (3rd column)
+                    elif len(df_candidate.columns) > 2:
+                        # print(f"DEBUG: Taking column at index 2 as potential market cap: {df_candidate.columns[2]}") # Debug print removed
+                        market_cap_col_candidate = df_candidate.columns[2]
+
+                    if market_cap_col_candidate:
+                        # print(f"DEBUG: Selected market cap column: '{market_cap_col_candidate}'") # Debug print removed
+                        df_banks_raw = df_candidate[["Bank name", market_cap_col_candidate]].copy()
+                        df_banks_raw.rename(columns={market_cap_col_candidate: "Market cap (USD billion)"}, inplace=True)
+                        # print("Tabela 'By market capitalization' (assumed 3rd wikitable) processed.") # Debug print removed
+                    # else:
+                        # print("DEBUG: Could not identify a suitable market cap column in the 3rd wikitable.") # Debug print removed
+            # else:
+                # print("DEBUG: pd.read_html returned no DataFrames for the 3rd wikitable.") # Debug print removed
+        except Exception as e:
+            print(f"Error processing the assumed 'By market capitalization' table: {e}") # Changed to error for user visibility
+
+    if df_banks_raw is None:
         print(
-            "Erro: Não foi possível encontrar a tabela 'By market capitalization'. O layout da página pode ter mudado."
+            "Erro: Não foi possível processar a tabela 'By market capitalization' (assumed 3rd wikitable). O layout da página pode ter mudado."
         )
-        sys.exit()  # Encerra o script se a tabela não for encontrada.
-
-    # Convertendo a tabela HTML para um DataFrame do Pandas.
-    # O 'header=1' diz ao Pandas para usar a segunda linha do cabeçalho (índice 1) como os nomes das colunas,
-    # o que simplifica o cabeçalho de múltiplas linhas.
-    df_banks_raw = pd.read_html(str(table), header=1)[0]
-
-    # Selecionamos as colunas que nos interessam. Dada a nova estrutura,
-    # queremos 'Bank name' e a primeira coluna 'Market cap (US$ billion)'.
-    df_banks_raw = df_banks_raw[["Bank name", "Market cap(US$ billion)"]]
+        sys.exit()
 
     # Removendo a linha de referência, se existir (começa com '[')
+    # e outras linhas que não são nomes de bancos (ex: linhas de cabeçalho repetidas)
     df_banks_raw = df_banks_raw[
-        ~df_banks_raw["Bank name"].str.startswith("[", na=False)
-    ]
+        ~df_banks_raw["Bank name"].astype(str).str.startswith("[", na=False) &
+        df_banks_raw["Bank name"].notna() &
+        ~df_banks_raw["Bank name"].astype(str).str.contains("Rank", na=False, case=False) & # Remover linhas de cabeçalho com "Rank"
+        (df_banks_raw["Bank name"].astype(str) != "Bank name") # Remover a linha que é o próprio cabeçalho
+    ].copy()
 
     # Selecionando os 5 maiores bancos
     df_top5_banks = df_banks_raw.head(5).copy()
 
-    # Renomeando as colunas para o padrão que o resto do script espera
-    df_top5_banks.columns = ["Bank name", "Market cap (USD billion)"]
+    # Renomeando as colunas para o padrão que o resto do script espera - já done by rename above
+    # df_top5_banks.columns = ["Bank name", "Market cap (USD billion)"] # This line is redundant now
 
     print("Extração dos dados dos 5 maiores bancos concluída.")
     print("Dados extraídos:")
