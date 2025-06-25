@@ -1,4 +1,5 @@
 import requests
+import sys
 import pandas as pd
 from bs4 import BeautifulSoup
 
@@ -36,10 +37,17 @@ def run_etl_pipeline():
 
     # Encontrando a tabela correta. A legenda da tabela que queremos é
     # 'By market capitalization'.
-    table_title = "By market capitalization"
-    table = soup.find("caption", string=lambda t: t and table_title in t).find_parent(
-        "table"
-    )
+    table = None
+    span = soup.find("span", id="By_market_capitalization")
+    if span:
+        # O 'find_next' é usado para encontrar a próxima tag 'table' após o título
+        table = span.find_next("table")
+
+    if table is None:
+        print(
+            "Erro: Não foi possível encontrar a tabela 'By market capitalization'. O layout da página pode ter mudado."
+        )
+        sys.exit()  # Encerra o script se a tabela não for encontrada.
 
     # Convertendo a tabela HTML para um DataFrame do Pandas
     df_banks_raw = pd.read_html(str(table))[0]
