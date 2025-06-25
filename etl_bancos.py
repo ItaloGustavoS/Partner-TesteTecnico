@@ -33,3 +33,19 @@ def run_etl_pipeline():
 
     # Usando BeautifulSoup para parsear o conteúdo HTML da página
     soup = BeautifulSoup(response_wiki.content, "html.parser")
+
+    # Encontrando a tabela correta. A legenda da tabela que queremos é
+    # 'By market capitalization'.
+    table_title = "By market capitalization"
+    table = soup.find("caption", string=lambda t: t and table_title in t).find_parent(
+        "table"
+    )
+
+    # Convertendo a tabela HTML para um DataFrame do Pandas
+    df_banks_raw = pd.read_html(str(table))[0]
+
+    # Selecionando os 5 maiores bancos
+    df_top5_banks = df_banks_raw.head(5)
+
+    # Renomeando as colunas para facilitar o acesso
+    df_top5_banks.columns = ["Rank", "Bank name", "Market cap (USD billion)"]
