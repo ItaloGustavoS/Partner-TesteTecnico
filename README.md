@@ -66,21 +66,16 @@ Este script Python (`etl_bancos.py`) implementa um pipeline de Extração, Trans
 
 1.  **Agendamento de Tarefas (Scheduling)**:
     *   **Cron (Linux/macOS)**: Configurar uma tarefa cron para executar o script `etl_bancos.py` em intervalos regulares (ex: diariamente, semanalmente).
-        ```cron
-        0 0 * * * /usr/bin/python3 /caminho/para/etl_bancos.py >> /caminho/para/etl_log.txt 2>&1
-        ```
     *   **Agendador de Tarefas (Windows)**: Usar o Agendador de Tarefas para configurar execuções periódicas.
-    *   **Ferramentas de Orquestração de Workflow**: Para pipelines mais complexos, ferramentas como [Apache Airflow](https://airflow.apache.org/) ou [Prefect](https://www.prefect.io/) são ideais. Elas permitem definir DAGs (Directed Acyclic Graphs) para o pipeline, gerenciar dependências, novas tentativas, logging e monitoramento de forma robusta.
 
 2.  **Conteinerização (Containerization)**:
-    *   Empacotar o script e suas dependências em um contêiner Docker. Isso garante um ambiente consistente e facilita a implantação em diferentes sistemas ou na nuvem.
+    *   Empacotar o script e suas dependências em um contêiner Docker para a implantação em diferentes sistemas ou na nuvem.
     *   O contêiner pode ser executado por um agendador ou orquestrador.
 
 ### Escalabilidade
 
 1.  **Processamento de Dados em Larga Escala**:
     *   **Pandas com Otimizações**: Para volumes de dados que ainda cabem na memória, mas são grandes, otimizar o uso de Pandas (ex: usar tipos de dados eficientes, processamento em chunks) pode ajudar.
-    *   **Dask ou Spark**: Se o volume de dados exceder a capacidade da memória de uma única máquina, ou se for necessário processamento distribuído, migrar a lógica de transformação para frameworks como Dask (que tem uma API similar ao Pandas) ou Apache Spark é uma boa solução. Isso permitiria processar os dados em um cluster de máquinas.
 
 2.  **Fontes de Dados e Destinos**:
     *   **Bancos de Dados**: Em vez de CSVs, carregar os dados em um banco de dados relacional (PostgreSQL, MySQL) ou NoSQL (MongoDB), ou em um data warehouse (BigQuery, Redshift, Snowflake). Isso melhora a capacidade de consulta, integridade e gerenciamento dos dados.
@@ -88,12 +83,10 @@ Este script Python (`etl_bancos.py`) implementa um pipeline de Extração, Trans
 
 3.  **Monitoramento e Logging**:
     *   Implementar logging detalhado em todo o pipeline para rastrear o progresso e identificar erros rapidamente.
-    *   Usar ferramentas de monitoramento (ex: Prometheus, Grafana, ou dashboards de serviços em nuvem) para observar a performance do pipeline e a qualidade dos dados.
+    *   Usar ferramentas de monitoramento para observar a performance do pipeline e a qualidade dos dados.
 
 4.  **Qualidade de Dados**:
     *   Adicionar etapas de validação de dados (ex: usando bibliotecas como `Great Expectations`) para garantir que os dados extraídos e transformados atendam a critérios de qualidade definidos (ex: tipos corretos, faixas de valores esperadas, ausência de nulos onde não deveriam existir).
 
 5.  **Arquitetura Baseada em Eventos**:
     *   Para cenários mais dinâmicos, considerar uma arquitetura orientada a eventos, onde o pipeline é acionado por eventos (ex: atualização da página da Wikipedia detectada, chegada de novos arquivos de taxas de câmbio).
-
-Ao combinar essas estratégias, o pipeline pode se tornar mais robusto, confiável e capaz de lidar com volumes maiores de dados e requisitos de processamento mais complexos.
